@@ -1,0 +1,18 @@
+﻿<Window x:Class="Sandman.MainWindow"
+   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+   xmlns:local="clr-namespace:Sandman"
+   mc:Ignorable="d"
+   Title="Sandman" Width="600" Height="400"
+   Icon="/Sandman;component/Resources/weather_moon_half.png"
+   Loaded="Window_Loaded"
+	Closing="Window_Closing"
+>
+   <Grid>
+		<TextBox TextWrapping="Wrap" Text="{Binding ConsoleLog, Mode=OneWay}"
+			BorderThickness="0" IsReadOnly="True" IsReadOnlyCaretVisible="True" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto"
+		/>
+	</Grid>
+</Window>
