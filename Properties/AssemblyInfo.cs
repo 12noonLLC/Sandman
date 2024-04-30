@@ -12,7 +12,7 @@ using System.Windows;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("12noon")]
 [assembly: AssemblyProduct("Sandman")]
-[assembly: AssemblyCopyright("\u00A9 2020-2021 12noon, Stefan K.S. Tucker")]
+[assembly: AssemblyCopyright("\u00A9 2020-2024 12noon, Stefan K.S. Tucker")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -51,8 +51,8 @@ using System.Windows;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.1.4.0")]
-[assembly: AssemblyFileVersion("1.1.4.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 // This must match the MSBuild TFM specified in the CSPROJ.
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows10.0.20348.0")]
