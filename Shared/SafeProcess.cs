@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sandman.Shared
+namespace Shared
 {
 	/// <summary>
 	/// Elevated processes with administrator privileges cannot
@@ -14,7 +14,7 @@ namespace Sandman.Shared
 	/// to more easily special-case admin processes.
 	/// </summary>
 	/// <see cref="https://www.giorgi.dev/net/access-denied-process-bugs/" />
-	class SafeProcess : IDisposable
+	public class SafeProcess : IDisposable
 	{
 		public string Name { get => ProcessActual.ProcessName; }
 		public bool SafeIsElevated { get; private set; } = false;

@@ -1,30 +1,34 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Windows;
 using System.Windows.Forms;
 
 namespace MyLibrary
 {
-	public class NotificationIcon
+	public class NotificationIcon : IDisposable
 	{
 		private bool _bShouldClose = false;
 		private bool _bBalloonShown = false;
 
 		// Weak reference to Window so we don't keep it alive.
-		private readonly WeakReference<Window> _window = new WeakReference<Window>(null);
+		private readonly WeakReference<Window?> _window = new(null);
 
-		private NotifyIcon _notification = new NotifyIcon();
+		private readonly NotifyIcon _notification = new();
 
-		private Icon _iconOriginal = null;
+		private Icon _iconOriginal;
 		public void PushIcon(Icon icon) => _notification.Icon = icon;
 		public void PopIcon() => _notification.Icon = _iconOriginal;
+		private readonly ToolStripMenuItem _defaultMenuItem;
 
-		private readonly Timer _timerDoubleClick = new Timer();
+		private readonly Timer _timerDoubleClick = new();
 
 
+		[MemberNotNull(nameof(_iconOriginal))]
 		private void Initialize(Icon icon, string text)
 		{
-			_timerDoubleClick.Tick += (object sender, EventArgs e) =>
+			_timerDoubleClick.Tick += (object? sender, EventArgs e) =>
 			{
 				_timerDoubleClick.Stop();
 				OnClick();
@@ -45,7 +49,7 @@ namespace MyLibrary
 			_notification.MouseDoubleClick += OnMouseDoubleClick;
 		}
 
-		private void OnMouseClick(object sender, MouseEventArgs e)
+		private void OnMouseClick(object? sender, MouseEventArgs e)
 		{
 			if (e.Button != MouseButtons.Left)
 			{
@@ -53,16 +57,16 @@ namespace MyLibrary
 			}
 
 			/*
-				* Windows always raises a Click event before a DoubleClick event.
-				* So, we have to wait for the double-click interval to see if it's
-				* a click or a double-click.
-				*/
+			 * Windows always raises a Click event before a DoubleClick event.
+			 * So, we have to wait for the double-click interval to see if it's
+			 * a click or a double-click.
+			 */
 			_timerDoubleClick.Interval = SystemInformation.DoubleClickTime;
 			_timerDoubleClick.Start();
 			// If the timer expires before a double-click event, we do a single click.
 		}
 
-		private void OnMouseDoubleClick(object sender, MouseEventArgs e)
+		private void OnMouseDoubleClick(object? sender, MouseEventArgs e)
 		{
 			_timerDoubleClick.Stop();
 
@@ -79,33 +83,33 @@ namespace MyLibrary
 		/// <param name="icon"></param>
 		/// <param name="text"></param>
 		/// <param name="menuItems">Collection of menu items to insert between "Open" and "Exit"</param>
-		/// 
-		public NotificationIcon(Window w, Icon icon, string text, MenuItem[] menuItems)
+		///
+		public NotificationIcon(Window w, Icon icon, string text, ToolStripMenuItem[] menuItems)
 		{
 			Initialize(icon, text);
 			_notification.BalloonTipText = "The application is still running but its window is hidden. Use the notification-area icon to display the window or to exit the application.";
 			_window.SetTarget(w);
 
-			//app.Exit += (object sender, ExitEventArgs e) => { if (_notification != null) { _notification.Visible = false; } };
+			//app.Exit += (object sender, ExitEventArgs e) => { if (_notification is not null) { _notification.Visible = false; } };
 
-			_notification.ContextMenu = new ContextMenu();
+			_notification.ContextMenuStrip = new();
 
-			_notification.ContextMenu.MenuItems.Add(new MenuItem("Open", (object sender, EventArgs e) =>
+			_defaultMenuItem = new ToolStripMenuItem("Open", image: null, (object? sender, EventArgs e) =>
 			{
-				w.WindowState = WindowState.Normal;	// if it's minimized, we want to restore it
+				w.WindowState = WindowState.Normal; // if it's minimized, we want to restore it
 				w.Show();
-			})
-			{
-				DefaultItem = true,
 			});
+			_notification.ContextMenuStrip.Items.Add(_defaultMenuItem);
+			// .NET 6 removed the Default property, so we have to set the font bold manually.
+			_defaultMenuItem.Font = new Font(_defaultMenuItem.Font, _defaultMenuItem.Font.Style | System.Drawing.FontStyle.Bold);
 
-			_notification.ContextMenu.MenuItems.AddRange(menuItems);
+			_notification.ContextMenuStrip.Items.AddRange(menuItems);
 
-			_notification.ContextMenu.MenuItems.Add(new MenuItem("Exit", (object sender, EventArgs e) =>
+			_notification.ContextMenuStrip.Items.Add(new ToolStripMenuItem("Exit", image: null, (object? sender, EventArgs e) =>
 			{
 				// Disable all menu items.
 				// (We don't want to try to exit twice, and we can't show the window while it's closing.)
-				foreach (MenuItem item in _notification.ContextMenu.MenuItems)
+				foreach (ToolStripMenuItem item in _notification.ContextMenuStrip.Items)
 				{
 					item.Enabled = false;
 				}
@@ -124,7 +128,7 @@ namespace MyLibrary
 			_notification.MouseClick += OnMouseClick;
 			_notification.MouseDoubleClick += OnMouseDoubleClick;
 
-			foreach (MenuItem item in _notification.ContextMenu.MenuItems)
+			foreach (ToolStripMenuItem item in _notification.ContextMenuStrip!.Items)
 			{
 				item.Enabled = true;
 			}
@@ -136,24 +140,19 @@ namespace MyLibrary
 		private void OnClick()
 		{
 			// find the first menu item and invoke it
-			if (_notification.ContextMenu.MenuItems.Count >= 1)
+			if (_notification.ContextMenuStrip!.Items.Count >= 1)
 			{
-				MenuItem item = _notification.ContextMenu.MenuItems[0];
+				ToolStripItem item = _notification.ContextMenuStrip.Items[0];
 				item.PerformClick();
 			}
 		}
 
 		private void OnDoubleClick()
 		{
-			// find the default menu item and invoke it
-			foreach (MenuItem item in _notification.ContextMenu.MenuItems)
-			{
-				if (item.DefaultItem)
-				{
-					item.PerformClick();
-					return;
-				}
-			}
+			Debug.Assert(_notification.ContextMenuStrip!.Items.Contains(_defaultMenuItem));
+
+			// invoke the default menu item
+			_defaultMenuItem.PerformClick();
 		}
 
 		/// <summary>
@@ -171,7 +170,7 @@ namespace MyLibrary
 				return true;
 			}
 
-			if (_window.TryGetTarget(out Window w))
+			if (_window.TryGetTarget(out Window? w))
 			{
 				w.Hide();
 			}
@@ -185,14 +184,44 @@ namespace MyLibrary
 			return false;
 		}
 
+		#region IDisposable
+
+		private bool disposedValue;
+
 		/// <summary>
-		/// The app needs to call this after ShouldClose() returns true.
+		/// The app needs to dispose of this after ShouldClose() returns true.
 		/// </summary>
-		public void Destroy()
+		protected virtual void Dispose(bool disposing)
 		{
-			_notification.Dispose();
-			_notification = null;
+			if (!disposedValue)
+			{
+				if (disposing)
+				{
+					// Dispose managed state (managed objects)
+					_notification.Dispose();
+				}
+
+				// Free unmanaged resources (unmanaged objects) and override finalizer
+				// Set large fields to null
+				disposedValue = true;
+			}
 		}
+
+		// // override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+		// ~NotificationIcon()
+		// {
+		//     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		//     Dispose(disposing: false);
+		// }
+
+		public void Dispose()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
+		}
+
+		#endregion IDisposable
 	}
 }
 

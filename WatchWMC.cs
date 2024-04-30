@@ -1,4 +1,6 @@
-﻿using Microsoft.MediaCenter.TV.Scheduling;
+﻿#if INCLUDE_WMC
+using Microsoft.MediaCenter.TV.Scheduling;
+#endif
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -30,7 +32,7 @@ namespace Sandman
 		public static async Task StartAsync(MainWindow theWindow)
 		{
 			TheWindow = theWindow;
-			TheWindow.WriteOutput(String.Empty);
+			TheWindow.WriteOutput(string.Empty);
 			TheWindow.WriteOutput($"Note: Create file {StayAwakeFile} to stay awake.");
 
 #if INCLUDE_WMC
@@ -42,7 +44,7 @@ namespace Sandman
 			// Handle resuming from sleep.
 			SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
 			// It's a static event, so we have to remove the handler when our app is disposed to avoid memory leaks.
-			AppDomain.CurrentDomain.ProcessExit += (object senderExit, EventArgs eExit) =>
+			AppDomain.CurrentDomain.ProcessExit += (object? senderExit, EventArgs eExit) =>
 			{
 				SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
 			};
@@ -52,7 +54,7 @@ namespace Sandman
 			//delay and fire timer event
 			var timer = new System.Windows.Threading.DispatcherTimer();
 			timer.Interval = TimeSpan.FromSeconds(5);
-			timer.Tick += async (object sender, EventArgs e) =>
+			timer.Tick += async (object? sender, EventArgs e) =>
 			{
 				timer.Stop();
 				TheWindow.WriteOutput("Debug timer with new call to TrySuspendingComputerAsync().");
@@ -65,6 +67,7 @@ namespace Sandman
 		}
 
 
+#if INCLUDE_WMC
 		/// <summary>
 		/// This is called when a scheduled event changes.
 		/// </summary>
@@ -88,14 +91,15 @@ namespace Sandman
 				await TrySuspendingComputerAsync(TimeSpan.Zero);
 			}
 		}
+#endif
 
 
-		private static async void SystemEvents_PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+		private static async void SystemEvents_PowerModeChanged(object? sender, PowerModeChangedEventArgs e)
 		{
 			switch (e.Mode)
 			{
 				case PowerModes.Resume:
-					TheWindow.WriteOutput(String.Empty);
+					TheWindow.WriteOutput(string.Empty);
 					TheWindow.WriteOutput($"PowerMode: {e.Mode}");
 					await TrySuspendingComputerAsync(Properties.Settings.Default.DelayAfterResume);
 					break;
@@ -118,13 +122,13 @@ namespace Sandman
 		///	- WMC finishes recording
 		/// </remarks>
 		/// <returns>True if we suspended the computer.</returns>
-		private static CancellationTokenSource TokenSource { get; set; } = null;
+		private static CancellationTokenSource? TokenSource { get; set; } = null;
 		private static ManualResetEventSlim TrySuspendComplete { get; set; } = new ManualResetEventSlim();
 		private static async Task TrySuspendingComputerAsync(TimeSpan initialDelay)
 		{
 			CancellationTokenSource localTokenSource = new CancellationTokenSource();
 
-			if (TokenSource != null)
+			if (TokenSource is not null)
 			{
 				/// It's possible to get, for example, a WMC "recording finished" event while
 				/// we're waiting for "user activity" task. So we need to cancel an extant wait.
@@ -271,7 +275,7 @@ namespace Sandman
 			/// Not if the next recording will start soon.
 			///
 			ScheduleEvent nextRecording = GetNextScheduledRecording();
-			if (nextRecording != null)
+			if (nextRecording is not null)
 			{
 				TimeSpan spanUntilNextRecording = nextRecording.StartTime.Subtract(DateTime.UtcNow);
 				if (spanUntilNextRecording <= Properties.Settings.Default.MinimumTimeBeforeNextRecording)
@@ -314,10 +318,10 @@ namespace Sandman
 			///
 			var processNames = Properties.Settings.Default.BlacklistedProcesses.Split(';');
 			var runningProcesses = GetRunningProcesses(processNames);
-			Task runningTask = GetRunningProcessTask(runningProcesses, cancellationToken);
-			if (runningTask != null)
+			Task? runningTask = GetRunningProcessTask(runningProcesses, cancellationToken);
+			if (runningTask is not null)
 			{
-				TheWindow.WriteOutput($"Blacklisted process(es) [{String.Join(", ", runningProcesses.Select(p => p.Name))}] is/are open--staying awake.");
+				TheWindow.WriteOutput($"Blacklisted process(es) [{string.Join(", ", runningProcesses.Select(p => p.Name))}] is/are open--staying awake.");
 				return runningTask
 							.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
 			}
@@ -349,9 +353,9 @@ namespace Sandman
 		/// <param name="cancellationToken"></param>
 		private static async Task StayAwakeAsync(string stayAwakeFile, CancellationToken cancellationToken)
 		{
-			TaskCompletionSource<object> processComplete = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+			TaskCompletionSource<object?> processComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-			FileSystemWatcher watcher = CreateFileSystemWatcher(MainWindow.ExecutableFolder, stayAwakeFile);
+			FileSystemWatcher? watcher = CreateFileSystemWatcher(MainWindow.ExecutableFolder, stayAwakeFile);
 			if (watcher is null)
 			{
 				TheWindow.WriteOutput("Unable to watch stay-awake file.");
@@ -376,11 +380,17 @@ namespace Sandman
 
 			using (CancellationTokenRegistration registration = cancellationToken.Register(state =>
 					{
+						if (state is null)
+						{
+							return;
+						}
+
 						TheWindow.WriteOutput("CancellationTokenRegistration: Stay-awake wait canceled.");
 						FileSystemWatcher w = (FileSystemWatcher)state;
 						w.EnableRaisingEvents = false;
 						processComplete.TrySetCanceled();
-					}, watcher))
+					}, watcher)
+			)
 			{
 				try
 				{
@@ -396,7 +406,7 @@ namespace Sandman
 		}
 
 
-		public static FileSystemWatcher CreateFileSystemWatcher(string path, string filter)
+		public static FileSystemWatcher? CreateFileSystemWatcher(string path, string filter)
 		{
 			try
 			{
@@ -455,7 +465,7 @@ namespace Sandman
 		/// Task representing one of the blocking processes which will complete when the process exits.
 		/// If the wait is canceled, it will throw.
 		/// </returns>
-		private static Task GetRunningProcessTask(List<Shared.SafeProcess> processes, CancellationToken cancellationToken)
+		private static Task? GetRunningProcessTask(List<Shared.SafeProcess> processes, CancellationToken cancellationToken)
 		{
 			// Dispose of the other Process objects.
 			foreach (var p in processes.OrderBy(process => process.SafeIsElevated).Skip(1))
@@ -482,7 +492,7 @@ namespace Sandman
 																						DateTime.UtcNow.AddDays(1),
 																						ScheduleEventStates.IsOccurring)
 													.FirstOrDefault();
-				return (nextEvent != null);
+				return (nextEvent is not null);
 			}
 		}
 

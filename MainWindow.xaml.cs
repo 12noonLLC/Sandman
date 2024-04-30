@@ -13,16 +13,19 @@ namespace Sandman
 	/// </summary>
 	public partial class MainWindow : Window, INotifyPropertyChanged
 	{
-		public static readonly string ExecutableFolder;
+		public static readonly string ExecutableFolder = string.Empty;
 		public StringBuilder ConsoleLog { get; set; } = new StringBuilder();
 
-		private readonly MyLibrary.NotificationIcon _notificationIcon = null;
+		private readonly MyLibrary.NotificationIcon _notificationIcon;
 
 
 		static MainWindow()
 		{
 			var asm = System.Reflection.Assembly.GetEntryAssembly();
-			ExecutableFolder = Path.GetDirectoryName(asm.Location);
+			if (asm is not null)
+			{
+				ExecutableFolder = Path.GetDirectoryName(asm.Location) ?? string.Empty;
+			}
 		}
 		public MainWindow()
 		{
@@ -43,7 +46,7 @@ namespace Sandman
 			/*
 			 * Set up notification area icon
 			 */
-			_notificationIcon = new MyLibrary.NotificationIcon(this, Properties.Resources.Sandman, nameof(Sandman), new System.Windows.Forms.MenuItem[0]);
+			_notificationIcon = new MyLibrary.NotificationIcon(this, Properties.Resources.Sandman, nameof(Sandman), menuItems: []);
 
 			InitializeComponent();
 			DataContext = this;
@@ -85,7 +88,7 @@ namespace Sandman
 
 		#region INotifyPropertyChanged
 
-		public event PropertyChangedEventHandler PropertyChanged;
+		public event PropertyChangedEventHandler? PropertyChanged;
 
 		#endregion INotifyPropertyChanged
 

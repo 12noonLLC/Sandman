@@ -14,7 +14,7 @@ using System.Windows.Threading;
 /// await Shared.ThreadSwitcher.ResumeForegroundAsync(TheWindow.Dispatcher);
 /// </example>
 /// <see cref="https://devblogs.microsoft.com/oldnewthing/20190329-00/?p=102373"/>
-namespace Sandman.Shared
+namespace Shared
 {
 	// For WPF
 	struct DispatcherThreadSwitcher : INotifyCompletion

@@ -1,4 +1,6 @@
-# Sandman
+# Sandman by [12noon.com](https://12noon.com)
+
+[![.NET](https://github.com/skst/Sandman/actions/workflows/dotnet.yml/badge.svg)](https://github.com/skst/Sandman/actions/workflows/dotnet.yml)
 
 This application will suspend Windows after a specified period of time, but only
 if certain applications are not running, etc. This is very useful for home-theater
@@ -18,7 +20,7 @@ its `user.config` file located in the user's `AppData` folder.
 | MinimumTimeBeforeNextRecording | Sandman will not suspend the computer if Windows Media Center will begin a recording within this amount of time. | 30 minutes 
 | TimeUserInactiveBeforeSuspending | Sandman will not suspend the computer until the user has been inactive for this amount of time. | 30 minutes 
 
-¹ ehshell;epg123;epg123client;hdhr2mxf;epg123Transfer;WMC_Status;vlc
+¹ vlc;mpc-hc;Steam
 
 ² This is because Windows does not permit user-level processes
 sufficient access to elevated processes to wait for them to terminate.

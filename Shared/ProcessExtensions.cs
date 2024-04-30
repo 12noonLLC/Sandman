@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sandman.Shared
+namespace Shared
 {
 	static class ProcessExtensions
 	{
@@ -20,11 +20,16 @@ namespace Sandman.Shared
 		public static async Task MyWaitAsync(this Process process, TimeSpan delayElevatedProcess, CancellationToken cancellationToken)
 		{
 			/// <see cref="https://stackoverflow.com/a/50461641/4858"/>
-			TaskCompletionSource<bool> processComplete = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+			TaskCompletionSource<bool> processComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 			process.Exited += Process_Exited;
-			void Process_Exited(object sender, EventArgs e)
+			void Process_Exited(object? sender, EventArgs e)
 			{
+				if (sender is null)
+				{
+					return;
+				}
+
 				Trace.TraceInformation(nameof(Process_Exited));
 				Process p = (Process)sender;
 				p.EnableRaisingEvents = false;   // Throws Win32Exception if process is elevated.
@@ -54,13 +59,19 @@ namespace Sandman.Shared
 			}
 
 			using (CancellationTokenRegistration registration = cancellationToken.Register(state =>
-			{
-				Trace.TraceInformation($"{nameof(CancellationTokenRegistration)}: Process wait canceled.");
-				Process p = (Process)state;
-				p.EnableRaisingEvents = false;   // Throws Win32Exception if process is elevated.
-				process.Exited -= Process_Exited;
-				processComplete.TrySetCanceled(cancellationToken);
-			}, process))
+				{
+					if (state is null)
+					{
+						return;
+					}
+
+					Trace.TraceInformation($"{nameof(CancellationTokenRegistration)}: Process wait canceled.");
+					Process p = (Process)state;
+					p.EnableRaisingEvents = false;   // Throws Win32Exception if process is elevated.
+					process.Exited -= Process_Exited;
+					processComplete.TrySetCanceled(cancellationToken);
+				}, process)
+			)
 			{
 				try
 				{

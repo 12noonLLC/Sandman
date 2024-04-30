@@ -53,3 +53,7 @@ using System.Windows;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.1.4.0")]
 [assembly: AssemblyFileVersion("1.1.4.0")]
+
+// This must match the MSBuild TFM specified in the CSPROJ.
+[assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows10.0.20348.0")]
+[assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows10.0.20348.0")]
