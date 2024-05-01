@@ -36,7 +36,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 		string pathLog = Path.Combine(ExecutableFolder, "Sandman.log");
 
 		// add new default listener and set the filename
-		DefaultTraceListener listener = new DefaultTraceListener
+		DefaultTraceListener listener = new()
 		{
 			LogFileName = pathLog
 		};
@@ -75,7 +75,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
 	public void WriteOutput(string s)
 	{
-		string timestampedMessage = $"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}] (Thread {Thread.CurrentThread.ManagedThreadId:00}) {s}";
+		string timestampedMessage = $"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}] (Thread {Environment.CurrentManagedThreadId:00}) {s}";
 		Trace.TraceInformation(timestampedMessage);
 		ConsoleLog.AppendLine(timestampedMessage);
 
