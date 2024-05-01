@@ -55,7 +55,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
 	private async void Window_Loaded(object sender, RoutedEventArgs e)
 	{
-		await WatchWMC.StartAsync(this).ConfigureAwait(continueOnCapturedContext: false);
+		await WatchAndWait.StartAsync(this).ConfigureAwait(continueOnCapturedContext: false);
 	}
 
 

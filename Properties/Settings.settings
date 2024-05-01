@@ -2,9 +2,6 @@
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="Sandman.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
-    <Setting Name="MinimumTimeBeforeNextRecording" Type="System.TimeSpan" Scope="User">
-      <Value Profile="(Default)">00:30:00</Value>
-    </Setting>
     <Setting Name="DelayBeforeSuspending" Type="System.TimeSpan" Scope="User">
       <Value Profile="(Default)">00:00:10</Value>
     </Setting>

@@ -1,7 +1,4 @@
-﻿#if INCLUDE_WMC
-using Microsoft.MediaCenter.TV.Scheduling;
-#endif
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Sandman;
 
-public static class WatchWMC
+public static class WatchAndWait
 {
 	// Saving the window reference ensures this static class won't go out of scope and the event handler removed.
 	private static MainWindow TheWindow;
@@ -35,12 +32,6 @@ public static class WatchWMC
 		TheWindow.WriteOutput(string.Empty);
 		TheWindow.WriteOutput($"Note: Create file {StayAwakeFile} to stay awake.");
 
-#if INCLUDE_WMC
-		// Handle WMC events.
-		new EventSchedule().ScheduleEventStateChanged += WMC_ScheduleEventStateChanged;
-#else
-		TheWindow.WriteOutput("DEBUG: WMC features disabled.");
-#endif
 		// Handle resuming from sleep.
 		SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
 		// It's a static event, so we have to remove the handler when our app is disposed to avoid memory leaks.
@@ -50,9 +41,9 @@ public static class WatchWMC
 		};
 
 #if DEBUG
-		/// Simulate resuming or a WMC event causing this to cancel the wait.
+		/// Simulate resuming causing this to cancel the wait.
 		//delay and fire timer event
-		var timer = new System.Windows.Threading.DispatcherTimer();
+		System.Windows.Threading.DispatcherTimer timer = new();
 		timer.Interval = TimeSpan.FromSeconds(5);
 		timer.Tick += async (object? sender, EventArgs e) =>
 		{
@@ -65,34 +56,6 @@ public static class WatchWMC
 
 		await TrySuspendingComputerAsync(TimeSpan.Zero);
 	}
-
-
-#if INCLUDE_WMC
-	/// <summary>
-	/// This is called when a scheduled event changes.
-	/// </summary>
-	/// <see cref="https://docs.microsoft.com/en-us/previous-versions/windows/desktop/windows-media-center-sdk/bb189118" />
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private static async void WMC_ScheduleEventStateChanged(object sender, ScheduleEventChangedEventArgs e)
-	{
-#if DEBUG
-		foreach (ScheduleEventChange change in e.Changes)
-		{
-			TheWindow.WriteOutput($"WMC event: {change.PreviousState} -> {change.NewState}");
-		}
-#endif
-		// If one or more recordings have stopped, determine if we should suspend the computer.
-		if (e.Changes.Any(change => change.NewState.HasFlag(ScheduleEventStates.HasOccurred)))
-		{
-			//ScheduleEvent endedSchedule = new EventSchedule().GetScheduleEventWithId(change.ScheduleEventId) ?? throw new ArgumentNullException("ScheduleEvent");
-			TheWindow.WriteOutput("WMC finished recording.");
-
-			await TrySuspendingComputerAsync(TimeSpan.Zero);
-		}
-	}
-#endif
-
 
 	private static async void SystemEvents_PowerModeChanged(object? sender, PowerModeChangedEventArgs e)
 	{
@@ -111,7 +74,6 @@ public static class WatchWMC
 		}
 	}
 
-
 	/// <summary>
 	/// Check if we can suspend the computer.
 	/// </summary>
@@ -126,7 +88,7 @@ public static class WatchWMC
 	private static ManualResetEventSlim TrySuspendComplete { get; set; } = new ManualResetEventSlim();
 	private static async Task TrySuspendingComputerAsync(TimeSpan initialDelay)
 	{
-		CancellationTokenSource localTokenSource = new CancellationTokenSource();
+		CancellationTokenSource localTokenSource = new();
 
 		if (TokenSource is not null)
 		{
@@ -169,11 +131,7 @@ public static class WatchWMC
 				await Task.Delay(Properties.Settings.Default.DelayBeforeSuspending, localTokenSource.Token);
 			}
 
-#if INCLUDE_WMC
 			SleepComputer();
-#else
-			TheWindow.WriteOutput("DEBUG: Skipped sleeping computer.");
-#endif
 		}
 		catch (TaskCanceledException ex)			// From CancellationToken.Cancel
 		{
@@ -190,7 +148,6 @@ public static class WatchWMC
 			TrySuspendComplete.Set();
 		}
 	}
-
 
 	/// <summary>
 	/// Test the required conditions for suspending the computer. If they're
@@ -216,7 +173,6 @@ public static class WatchWMC
 		Debug.Assert((nextStep == EOnCompletion.StopChecking) || (nextStep == EOnCompletion.SuspendComputer));
 		return (nextStep == EOnCompletion.SuspendComputer);
 	}
-
 
 	/// <summary>
 	/// Determine if we should suspend the computer.
@@ -251,54 +207,6 @@ public static class WatchWMC
 						.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
 		}
 
-#if INCLUDE_WMC
-		/*
-		 *	Note: We must check upcoming recordings BEFORE current recordings.
-		 *	This is because WMC may begin recording AFTER we check for current
-		 *	recordings, and then not be returned as an upcoming recording.
-		 *		20:59:59 No current recording.
-		 *		21:00:00 RECORDING STARTS.
-		 *		21:00:01 No upcoming recording.
-		 *	But if we check for upcoming first, it will catch a soon-to-start
-		 *	recording.
-		 *		20:59:59 Upcoming recording exists!
-		 *		21:00:00 RECORDING STARTS.
-		 *		21:00:01 Current recording.
-		 *	And, if a current recording ends between checks, that's fine.
-		 *		20:59:59 No upcoming recording.
-		 *		21:00:00 RECORDING ENDS.
-		 *		21:00:01 No current recording.
-		 */
-
-		//TODO: Should we combine these recording tests? (Eliminates 50% of the calls)
-		///
-		/// Not if the next recording will start soon.
-		///
-		ScheduleEvent nextRecording = GetNextScheduledRecording();
-		if (nextRecording is not null)
-		{
-			TimeSpan spanUntilNextRecording = nextRecording.StartTime.Subtract(DateTime.UtcNow);
-			if (spanUntilNextRecording <= Properties.Settings.Default.MinimumTimeBeforeNextRecording)
-			{
-				TheWindow.WriteOutput($"A recording will start in {spanUntilNextRecording.TotalMinutes:N2} minutes--staying awake until then.");
-				return Task.Delay(spanUntilNextRecording, cancellationToken)
-							.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
-			}
-		}
-
-		///
-		/// Not if a recording is in progress
-		///
-		if (IsRecordingInProgress())
-		{
-			TheWindow.WriteOutput("WMC is recording--staying awake.");
-			return Task.FromResult(EOnCompletion.StopChecking);   // we'll get an event when it finishes
-		}
-#else
-		TheWindow.WriteOutput("DEBUG: Skipped check for WMC recordings.");
-#endif
-
-#if INCLUDE_WMC
 		///
 		/// Not if user has been active
 		///
@@ -306,12 +214,13 @@ public static class WatchWMC
 		if (remainingTime > TimeSpan.Zero)
 		{
 			TheWindow.WriteOutput($"User is active--staying awake for {remainingTime.TotalMinutes:N2} minutes...");
+#if DEBUG
+			TheWindow.WriteOutput($"DEBUG: Ignoring user activity.");
+#else
 			return Task.Delay(remainingTime, cancellationToken)
 						.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
-		}
-#else
-		TheWindow.WriteOutput("DEBUG: Skipped check for user activity.");
 #endif
+		}
 
 		///
 		/// Not if certain processes are open
@@ -333,7 +242,6 @@ public static class WatchWMC
 		TheWindow.WriteOutput("No activity is blocking.");
 		return Task.FromResult(EOnCompletion.SuspendComputer);
 	}
-
 
 	/// <summary>
 	/// Waits for the passed file to be deleted.
@@ -379,17 +287,17 @@ public static class WatchWMC
 		watcher.EnableRaisingEvents = true;
 
 		using (CancellationTokenRegistration registration = cancellationToken.Register(state =>
+			{
+				if (state is null)
 				{
-					if (state is null)
-					{
-						return;
-					}
+					return;
+				}
 
-					TheWindow.WriteOutput("CancellationTokenRegistration: Stay-awake wait canceled.");
-					FileSystemWatcher w = (FileSystemWatcher)state;
-					w.EnableRaisingEvents = false;
-					processComplete.TrySetCanceled();
-				}, watcher)
+				TheWindow.WriteOutput("CancellationTokenRegistration: Stay-awake wait canceled.");
+				FileSystemWatcher w = (FileSystemWatcher)state;
+				w.EnableRaisingEvents = false;
+				processComplete.TrySetCanceled();
+			}, watcher)
 		)
 		{
 			try
@@ -404,7 +312,6 @@ public static class WatchWMC
 			}
 		}
 	}
-
 
 	public static FileSystemWatcher? CreateFileSystemWatcher(string path, string filter)
 	{
@@ -421,9 +328,6 @@ public static class WatchWMC
 			return null;
 		}
 	}
-
-
-
 
 	/// <summary>
 	/// Get collection of blacklisted processes that are running.
@@ -447,7 +351,6 @@ public static class WatchWMC
 				})
 				.ToList();
 	}
-
 
 	/// <summary>
 	/// Return a task representing one of the running processes.
@@ -477,58 +380,19 @@ public static class WatchWMC
 					.SafeWaitAsync(Properties.Settings.Default.DelayForElevatedProcess, cancellationToken);
 	}
 
-
-#if INCLUDE_WMC
-	/// <summary>
-	/// Determine whether WMC is currently recording a program.
-	/// </summary>
-	/// <returns>True if a recording is in progress</returns>
-	private static bool IsRecordingInProgress()
-	{
-		using (EventSchedule schedule = new EventSchedule())
-		{
-			// Just look at +/- one day to find any ongoing recordings.
-			ScheduleEvent nextEvent = schedule.GetScheduleEvents(DateTime.UtcNow.AddDays(-1),
-																					DateTime.UtcNow.AddDays(1),
-																					ScheduleEventStates.IsOccurring)
-												.FirstOrDefault();
-			return (nextEvent is not null);
-		}
-	}
-
-
-	/// <summary>
-	/// Return the next scheduled recording.
-	/// </summary>
-	/// <returns>The next scheduled recording or null</returns>
-	private static ScheduleEvent GetNextScheduledRecording()
-	{
-		using (EventSchedule schedule = new EventSchedule())
-		{
-			// There can be 21 days of listings, so looking a month ahead is sufficient.
-			ScheduleEvent nextEvent = schedule.GetScheduleEvents(DateTime.UtcNow,
-																					DateTime.UtcNow.AddMonths(1),
-																					ScheduleEventStates.WillOccur | ScheduleEventStates.Alternate)
-												.Where(e => e.StartTime >= DateTime.UtcNow)
-												.OrderBy(e => e.StartTime)
-												.FirstOrDefault();
-			return nextEvent;
-		}
-	}
-#endif
-
-
-#if INCLUDE_WMC
 	/// <summary>
 	///
 	/// </summary>
-	/// <see cref="https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setsuspendstate?view=netframework-4.7.2"/>
+	/// <see cref="https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setsuspendstate"/>
 	private static void SleepComputer()
 	{
 		TheWindow.WriteOutput("Sleeping...");
 
+#if DEBUG
+		TheWindow.WriteOutput("DEBUG: Skipped sleeping computer.");
+#else
 		bool ok = System.Windows.Forms.Application.SetSuspendState(System.Windows.Forms.PowerState.Suspend, force: false, disableWakeEvent: false);
 		TheWindow.WriteOutput(ok ? "Success" : "Failure");
-	}
 #endif
+	}
 }
