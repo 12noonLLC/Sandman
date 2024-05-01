@@ -61,7 +61,7 @@ namespace Sandman.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("ehshell;epg123;epg123client;hdhr2mxf;epg123Transfer;WMC_Status;vlc")]
+        [global::System.Configuration.DefaultSettingValueAttribute("vlc;mpc-hc;steam")]
         public string BlacklistedProcesses {
             get {
                 return ((string)(this["BlacklistedProcesses"]));

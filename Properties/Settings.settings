@@ -12,7 +12,7 @@
       <Value Profile="(Default)">00:10:00</Value>
     </Setting>
     <Setting Name="BlacklistedProcesses" Type="System.String" Scope="User">
-      <Value Profile="(Default)">ehshell;epg123;epg123client;hdhr2mxf;epg123Transfer;WMC_Status;vlc</Value>
+      <Value Profile="(Default)">vlc;mpc-hc;steam</Value>
     </Setting>
     <Setting Name="DelayForElevatedProcess" Type="System.TimeSpan" Scope="User">
       <Value Profile="(Default)">00:01:00</Value>
