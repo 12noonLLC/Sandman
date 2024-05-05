@@ -1,18 +1,79 @@
 ﻿<Window x:Class="Sandman.MainWindow"
-   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-   xmlns:local="clr-namespace:Sandman"
-   mc:Ignorable="d"
-   Title="Sandman" Width="600" Height="400"
-   Icon="/Sandman;component/Resources/weather_moon_half.png"
-   Loaded="Window_Loaded"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:local="clr-namespace:Sandman"
+	xmlns:props="clr-namespace:Sandman.Properties"
+	mc:Ignorable="d"
+	Title="Sandman" Width="600" Height="400"
+	Icon="/Sandman;component/Resources/weather_moon_half.png"
+	Loaded="Window_Loaded"
 	Closing="Window_Closing"
 >
-   <Grid>
-		<TextBox TextWrapping="Wrap" Text="{Binding ConsoleLog, Mode=OneWay}"
-			BorderThickness="0" IsReadOnly="True" IsReadOnlyCaretVisible="True" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto"
-		/>
+	<Grid Margin="5">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+		</Grid.RowDefinitions>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition Width="*" />
+			<ColumnDefinition Width="Auto" />
+		</Grid.ColumnDefinitions>
+		<Grid.Resources>
+			<Style TargetType="Label">
+				<Setter Property="Margin" Value="0" />
+				<Setter Property="VerticalAlignment" Value="Center" />
+			</Style>
+			<Style TargetType="TextBlock">
+				<Setter Property="Margin" Value="5" />
+				<Setter Property="VerticalAlignment" Value="Center" />
+			</Style>
+			<Style TargetType="Border">
+				<Setter Property="Margin" Value="5" />
+			</Style>
+			<Style TargetType="Button">
+				<Setter Property="Margin" Value="5" />
+				<Setter Property="Padding" Value="5,0" />
+			</Style>
+			<Style TargetType="TextBox">
+				<Setter Property="Margin" Value="5" />
+				<Setter Property="Padding" Value="3" />
+				<Setter Property="VerticalAlignment" Value="Center" />
+			</Style>
+		</Grid.Resources>
+
+		<Label Grid.Row="0" Grid.Column="0" Content="Delay immediately before sleep:" />
+		<TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DelayBeforeSleep, Mode=TwoWay, Source={x:Static props:Settings.Default}}" />
+		<TextBlock Grid.Row="0" Grid.Column="2" Text="hh:mm:ss" />
+
+		<Label Grid.Row="1" Grid.Column="0" Content="User inactive before sleep:" />
+		<TextBox Grid.Row="1" Grid.Column="1" Text="{Binding TimeUserInactiveBeforeSleep, Mode=TwoWay, Source={x:Static props:Settings.Default}}" />
+		<TextBlock Grid.Row="1" Grid.Column="2" Text="hh:mm:ss" />
+
+		<Label Grid.Row="2" Grid.Column="0" Content="Delay after resume:" />
+		<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DelayAfterResume, Mode=TwoWay, Source={x:Static props:Settings.Default}}" />
+		<TextBlock Grid.Row="2" Grid.Column="2" Text="hh:mm:ss" />
+
+		<Label Grid.Row="3" Grid.Column="0" Content="Elevated process delay:" />
+		<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding DelayForElevatedProcess, Mode=TwoWay, Source={x:Static props:Settings.Default}}" />
+		<TextBlock Grid.Row="3" Grid.Column="2" Text="hh:mm:ss" />
+
+		<Label Grid.Row="4" Grid.Column="0" Content="Blocking processes:" />
+		<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding BlockingProcesses, Mode=TwoWay, Source={x:Static props:Settings.Default}}" />
+
+		<Button Grid.Row="4" Grid.Column="2" Content="Restart" Click="RestartButton_Click" />
+
+		<Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" BorderBrush="Black" BorderThickness="1">
+			<TextBox x:Name="CtlLog" Margin="0" Padding="0" BorderThickness="0" TextWrapping="Wrap" VerticalAlignment="Stretch"
+				Text="{Binding ConsoleLog, Mode=OneWay}"
+				IsReadOnly="True" IsReadOnlyCaretVisible="True" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto"
+			/>
+		</Border>
 	</Grid>
 </Window>

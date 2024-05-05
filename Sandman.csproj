@@ -23,6 +23,10 @@
     <Content Include="Resources\Sandman.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+  </ItemGroup>
+
 	<ItemGroup>
 		<Resource Include="Resources\Sandman.ico" />
 		<Resource Include="Resources\weather_moon_halfx16.png" />

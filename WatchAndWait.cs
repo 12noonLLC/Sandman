@@ -12,25 +12,24 @@ namespace Sandman;
 public static class WatchAndWait
 {
 	// Saving the window reference ensures this static class won't go out of scope and the event handler removed.
-	private static MainWindow TheWindow;
+	private static MainWindow? TheWindow;
 
 	private static readonly string StayAwakeFile = Path.ChangeExtension(Environment.MachineName, "txt");
 
 	/// <summary>
-	/// Wait for WMC events.
-	/// On recording stop:
-	///	If WMC is open, do nothing.
-	///	If a recording is in progress, do nothing.
-	///	If a recording will start soon, do nothing.
-	///	If the user has been active recently, do nothing.
-	/// 	Short pause (to finish writing recording, etc.?).
-	/// 	Suspend computer.
+	/// If the user has been active recently, wait again.
+	/// Short pause (for processes to finish activities).
+	/// Sleep computer.
 	/// </summary>
 	public static async Task StartAsync(MainWindow theWindow)
 	{
+		if (TheWindow is not null)
+		{
+			throw new ArgumentException($"{nameof(StartAsync)} should be called only once.");
+		}
+
 		TheWindow = theWindow;
-		TheWindow.WriteOutput(string.Empty);
-		TheWindow.WriteOutput($"Note: Create file {StayAwakeFile} to stay awake.");
+		TheWindow.WriteInformation($"Note: You can create a file named \"{StayAwakeFile}\" in this folder to stay awake while the file exists.");
 
 		// Handle resuming from sleep.
 		SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
@@ -40,31 +39,19 @@ public static class WatchAndWait
 			SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
 		};
 
-#if DEBUG
-		/// Simulate resuming causing this to cancel the wait.
-		//delay and fire timer event
-		System.Windows.Threading.DispatcherTimer timer = new();
-		timer.Interval = TimeSpan.FromSeconds(5);
-		timer.Tick += async (object? sender, EventArgs e) =>
-		{
-			timer.Stop();
-			TheWindow.WriteOutput("Debug timer with new call to TrySuspendingComputerAsync().");
-			await TrySuspendingComputerAsync(TimeSpan.Zero);
-		};
-		timer.Start();
-#endif
-
-		await TrySuspendingComputerAsync(TimeSpan.Zero);
+		await TrySleepComputerAsync(TimeSpan.Zero).ConfigureAwait(continueOnCapturedContext: false);
 	}
 
 	private static async void SystemEvents_PowerModeChanged(object? sender, PowerModeChangedEventArgs e)
 	{
+		ArgumentNullException.ThrowIfNull(TheWindow);
+
 		switch (e.Mode)
 		{
 			case PowerModes.Resume:
-				TheWindow.WriteOutput(string.Empty);
-				TheWindow.WriteOutput($"PowerMode: {e.Mode}");
-				await TrySuspendingComputerAsync(Properties.Settings.Default.DelayAfterResume);
+				TheWindow.WriteInformation(string.Empty);
+				TheWindow.WriteInformation($"PowerMode: {e.Mode}");
+				await TrySleepComputerAsync(Properties.Settings.Default.DelayAfterResume);
 				break;
 
 			case PowerModes.Suspend:
@@ -75,36 +62,30 @@ public static class WatchAndWait
 	}
 
 	/// <summary>
-	/// Check if we can suspend the computer.
+	/// Check if we can sleep the computer.
 	/// </summary>
 	/// <remarks>
 	/// This is called when:
 	///	- the application starts
 	///	- the computer resumes from standby
-	///	- WMC finishes recording
+	///	- the UI restarts the wait
 	/// </remarks>
-	/// <returns>True if we suspended the computer.</returns>
+	/// <returns>True if we put the computer to sleep.</returns>
 	private static CancellationTokenSource? TokenSource { get; set; } = null;
-	private static ManualResetEventSlim TrySuspendComplete { get; set; } = new ManualResetEventSlim();
-	private static async Task TrySuspendingComputerAsync(TimeSpan initialDelay)
+	private static ManualResetEventSlim TrySleepComplete { get; set; } = new ManualResetEventSlim();
+	public static async Task RestartWaitAsync() => await TrySleepComputerAsync(TimeSpan.Zero).ConfigureAwait(continueOnCapturedContext: false);
+	private static async Task TrySleepComputerAsync(TimeSpan initialDelay)
 	{
+		ArgumentNullException.ThrowIfNull(TheWindow);
+
+		await CancelWaitTaskAsync();
+		Debug.Assert(TokenSource is null);
+
+		TheWindow.WriteInformation("Checking if we can sleep...");
+
 		CancellationTokenSource localTokenSource = new();
 
-		if (TokenSource is not null)
-		{
-			/// It's possible to get, for example, a WMC "recording finished" event while
-			/// we're waiting for "user activity" task. So we need to cancel an extant wait.
-			TokenSource.Cancel();
-
-			// Wait for task to complete cancellation and signal.
-			await Shared.ThreadSwitcher.ResumeBackgroundAsync();
-			TrySuspendComplete.Wait();
-			await Shared.ThreadSwitcher.ResumeForegroundAsync(TheWindow.Dispatcher);
-
-			TokenSource.Dispose();
-		}
-
-		TrySuspendComplete.Reset();
+		TrySleepComplete.Reset();
 		TokenSource = localTokenSource;  // "publish" a reference for other threads to use to cancel this one
 
 		// Switch to background to do the wait
@@ -112,70 +93,110 @@ public static class WatchAndWait
 
 		try
 		{
-			// If we delay before suspending, we need to be able to cancel it.
+			// If we delay before sleeping, we need to be able to cancel it.
 			if (initialDelay > TimeSpan.Zero)
 			{
-				TheWindow.WriteOutput($"Initial delay for {initialDelay.TotalMinutes:N2} minutes...");
+				TheWindow.WriteInformation($"Initial delay for {initialDelay.TotalMinutes:N2} minutes...");
 				await Task.Delay(initialDelay, localTokenSource.Token);
 			}
 
-			if (!await WaitUntilCanSuspendComputerAsync(localTokenSource.Token))
+			if (!await WaitUntilCanSleepComputerAsync(localTokenSource.Token))
 			{
+				// Stop checking
 				return;
 			}
 
 			// Wait a bit in case something needs to finish.
-			if (Properties.Settings.Default.DelayBeforeSuspending > TimeSpan.Zero)
+			if (Properties.Settings.Default.DelayBeforeSleep > TimeSpan.Zero)
 			{
-				TheWindow.WriteOutput($"Delaying {Properties.Settings.Default.DelayBeforeSuspending.TotalSeconds:N2} seconds before sleeping...");
-				await Task.Delay(Properties.Settings.Default.DelayBeforeSuspending, localTokenSource.Token);
+				TheWindow.WriteInformation($"Delaying {Properties.Settings.Default.DelayBeforeSleep.TotalSeconds:N0} seconds before sleeping...");
+				await Task.Delay(Properties.Settings.Default.DelayBeforeSleep, localTokenSource.Token);
 			}
 
 			SleepComputer();
 		}
-		catch (TaskCanceledException ex)			// From CancellationToken.Cancel
+		catch (TaskCanceledException ex)			// From CancellationToken.Cancel()
 		{
-			TheWindow.WriteOutput($"{ex.GetType()}: {ex.Message}--stop checking.");
+			TheWindow.WriteInformation($"{ex.GetType()}: {ex.Message}--stop checking.");
+			return;
 		}
 		catch (OperationCanceledException ex)  // From CancellationTokenRegistration?
 		{
-			TheWindow.WriteOutput($"{ex.GetType()}: {ex.Message}--stop checking.");
+			TheWindow.WriteInformation($"{ex.GetType()}: {ex.Message}--stop checking.");
+			return;
 		}
 		finally
 		{
 			/// We need to signal we're complete--whether it's RanToCompletion
 			/// or Canceled--so that the above wait for completion will succeed.
-			TrySuspendComplete.Set();
+			TrySleepComplete.Set();
 		}
+
+#if DEBUG
+		TheWindow.WriteWarning("DEBUG: Skipped sleeping computer. Simulate resuming...");
+		/// Simulate resuming (also give us time to set the <see cref="TrySleepComplete"/> event.
+		/// Note: We have to do this AFTER the above `finally` so that the event is set.
+		/// Then, when we try to sleep again, the wait for the event will succeed (not block).
+		await TrySleepComputerAsync(Properties.Settings.Default.DelayAfterResume);
+#endif
 	}
 
 	/// <summary>
-	/// Test the required conditions for suspending the computer. If they're
+	/// Cancel the task waiting until it can sleep the computer.
+	/// </summary>
+	/// <remarks>This must be called before the application exits.</remarks>
+	public static async Task CancelWaitTaskAsync()
+	{
+		if (TokenSource is null)
+		{
+			return;
+		}
+
+		ArgumentNullException.ThrowIfNull(TheWindow);
+
+		/// It's possible to get, for example, a WMC "recording finished" event while
+		/// we're waiting for "user activity" task. So we need to cancel an extant wait.
+		TokenSource.Cancel();
+
+		// Wait for task to complete cancellation and signal.
+		await Shared.ThreadSwitcher.ResumeBackgroundAsync();
+		TrySleepComplete.Wait();
+		await Shared.ThreadSwitcher.ResumeForegroundAsync(TheWindow.Dispatcher);
+
+		TokenSource.Dispose();
+
+		TokenSource = null;
+	}
+
+	/// <summary>
+	/// Test the required conditions for sleeping the computer. If they're
 	/// not present, keep trying until we're canceled or should stop.
 	/// </summary>
 	/// <param name="cancellationToken"></param>
-	/// <returns>True if computer can be suspended; false if we are to stop checking</returns>
+	/// <returns>True if computer can sleep; false if we are to stop checking</returns>
 	private enum EOnCompletion
 	{
 		CheckAgain,
 		StopChecking,
-		SuspendComputer,
+		SleepComputer,
 	}
-	private static async Task<bool> WaitUntilCanSuspendComputerAsync(CancellationToken cancellationToken)
+	private static async Task<bool> WaitUntilCanSleepComputerAsync(CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(TheWindow);
+
 		EOnCompletion nextStep;
 		do
 		{
-			nextStep = await CanSuspendComputer(cancellationToken);
-			TheWindow.WriteOutput($"Done awaiting. [{nextStep}]");
+			nextStep = await CanSleepComputer(cancellationToken);
+			TheWindow.WriteInformation($"Done awaiting. [{nextStep}]");
 		} while (nextStep == EOnCompletion.CheckAgain);
 
-		Debug.Assert((nextStep == EOnCompletion.StopChecking) || (nextStep == EOnCompletion.SuspendComputer));
-		return (nextStep == EOnCompletion.SuspendComputer);
+		Debug.Assert((nextStep == EOnCompletion.StopChecking) || (nextStep == EOnCompletion.SleepComputer));
+		return (nextStep == EOnCompletion.SleepComputer);
 	}
 
 	/// <summary>
-	/// Determine if we should suspend the computer.
+	/// Determine if we should sleep the computer.
 	/// If we can't, return a task we can wait for (and then check again).
 	/// </summary>
 	/// <remarks>
@@ -187,10 +208,12 @@ public static class WatchAndWait
 	/// <exception cref="TaskCanceledException"/>
 	/// <returns>
 	/// Task to wait for. (It may already be completed.)
-	/// The task's result can be: Check again, Stop checking, or Suspend computer.
+	/// The task's result can be: Check again, Stop checking, or sleep computer.
 	/// </returns>
-	private static Task<EOnCompletion> CanSuspendComputer(CancellationToken cancellationToken)
+	private static Task<EOnCompletion> CanSleepComputer(CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(TheWindow);
+
 		///
 		/// If any of these are happening, we create a task to wait for.
 		/// Else, we return a completed task with the desired result.
@@ -202,7 +225,7 @@ public static class WatchAndWait
 		/// if file is present, wait for it to be deleted (or canceled).
 		if (File.Exists(Path.Combine(MainWindow.ExecutableFolder, StayAwakeFile)))
 		{
-			TheWindow.WriteOutput("Stay-awake file exists--staying awake.");
+			TheWindow.WriteInformation("Stay-awake file exists--staying awake.");
 			return StayAwakeAsync(StayAwakeFile, cancellationToken)
 						.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
 		}
@@ -210,37 +233,39 @@ public static class WatchAndWait
 		///
 		/// Not if user has been active
 		///
-		var remainingTime = Properties.Settings.Default.TimeUserInactiveBeforeSuspending - NativeMethods.GetTimeSinceLastActivity();
+		var remainingTime = Properties.Settings.Default.TimeUserInactiveBeforeSleep - NativeMethods.GetTimeSinceLastActivity();
+#if DEBUG
+		TheWindow.WriteWarning($"DEBUG: Changing user-activity timeout to 5 seconds (instead of {remainingTime.TotalMinutes:N2} minutes).");
+		remainingTime = TimeSpan.FromSeconds(5) - NativeMethods.GetTimeSinceLastActivity();
+#endif
 		if (remainingTime > TimeSpan.Zero)
 		{
-			TheWindow.WriteOutput($"User is active--staying awake for {remainingTime.TotalMinutes:N2} minutes...");
-#if DEBUG
-			TheWindow.WriteOutput($"DEBUG: Ignoring user activity.");
-#else
+			TheWindow.WriteInformation($"User is active--staying awake for {remainingTime.TotalMinutes:N2} minutes...");
 			return Task.Delay(remainingTime, cancellationToken)
 						.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
-#endif
 		}
 
 		///
 		/// Not if certain processes are open
 		///
-		var processNames = Properties.Settings.Default.BlacklistedProcesses.Split(';');
+		var processNames = Properties.Settings.Default.BlockingProcesses.Split(';');
 		var runningProcesses = GetRunningProcesses(processNames);
 		Task? runningTask = GetRunningProcessTask(runningProcesses, cancellationToken);
 		if (runningTask is not null)
 		{
-			TheWindow.WriteOutput($"Blacklisted process(es) [{string.Join(", ", runningProcesses.Select(p => p.Name))}] is/are open--staying awake.");
+			Debug.Assert(runningProcesses.Count > 0);
+
+			TheWindow.WriteInformation($"Blocking process{((runningProcesses.Count == 1) ? string.Empty : "(es)")} [{string.Join(", ", runningProcesses.Select(p => p.Name))}] {((runningProcesses.Count == 1) ? "is" : "are")} open--staying awake.");
 			return runningTask
 						.ContinueWith((Task completed) => EOnCompletion.CheckAgain, TaskContinuationOptions.NotOnCanceled);
 		}
-		// There are no running processes, so continue.
+		// There are no blocking processes, so continue.
 
 		Debug.Assert(!cancellationToken.IsCancellationRequested, "If cancellation was requested, we should have thrown already.");
 		cancellationToken.ThrowIfCancellationRequested();	// just in case
 
-		TheWindow.WriteOutput("No activity is blocking.");
-		return Task.FromResult(EOnCompletion.SuspendComputer);
+		TheWindow.WriteInformation("No activity is blocking.");
+		return Task.FromResult(EOnCompletion.SleepComputer);
 	}
 
 	/// <summary>
@@ -261,27 +286,29 @@ public static class WatchAndWait
 	/// <param name="cancellationToken"></param>
 	private static async Task StayAwakeAsync(string stayAwakeFile, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(TheWindow);
+
 		TaskCompletionSource<object?> processComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		FileSystemWatcher? watcher = CreateFileSystemWatcher(MainWindow.ExecutableFolder, stayAwakeFile);
 		if (watcher is null)
 		{
-			TheWindow.WriteOutput("Unable to watch stay-awake file.");
+			TheWindow.WriteError("Unable to watch stay-awake file.");
 			return;
 		}
 		watcher.Created += (object sender, FileSystemEventArgs e) =>
 		{
-			TheWindow.WriteOutput("Stay-awake file has been created.");
+			TheWindow.WriteInformation("Stay-awake file has been created.");
 			processComplete.TrySetResult(null);
 		};
 		watcher.Renamed += (object sender, RenamedEventArgs e) =>
 		{
-			TheWindow.WriteOutput("Stay-awake file has been renamed.");
+			TheWindow.WriteInformation("Stay-awake file has been renamed.");
 			processComplete.TrySetResult(null);
 		};
 		watcher.Deleted += (object sender, FileSystemEventArgs e) =>
 		{
-			TheWindow.WriteOutput("Stay-awake file has been deleted.");
+			TheWindow.WriteInformation("Stay-awake file has been deleted.");
 			processComplete.TrySetResult(null);
 		};
 		watcher.EnableRaisingEvents = true;
@@ -293,7 +320,7 @@ public static class WatchAndWait
 					return;
 				}
 
-				TheWindow.WriteOutput("CancellationTokenRegistration: Stay-awake wait canceled.");
+				TheWindow.WriteInformation($"{nameof(CancellationTokenRegistration)}: Stay-awake wait canceled.");
 				FileSystemWatcher w = (FileSystemWatcher)state;
 				w.EnableRaisingEvents = false;
 				processComplete.TrySetCanceled();
@@ -381,18 +408,23 @@ public static class WatchAndWait
 	}
 
 	/// <summary>
-	///
+	/// Put the computer in sleep mode.
 	/// </summary>
 	/// <see cref="https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setsuspendstate"/>
+	[Conditional("RELEASE")]
 	private static void SleepComputer()
 	{
-		TheWindow.WriteOutput("Sleeping...");
+		ArgumentNullException.ThrowIfNull(TheWindow);
 
-#if DEBUG
-		TheWindow.WriteOutput("DEBUG: Skipped sleeping computer.");
-#else
+		TheWindow.WriteInformation("Sleeping...");
 		bool ok = System.Windows.Forms.Application.SetSuspendState(System.Windows.Forms.PowerState.Suspend, force: false, disableWakeEvent: false);
-		TheWindow.WriteOutput(ok ? "Success" : "Failure");
-#endif
+		if (ok)
+		{
+			TheWindow.WriteInformation("Success");
+		}
+		else
+		{
+			TheWindow.WriteError("Failure");
+		}
 	}
 }

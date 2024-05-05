@@ -17,7 +17,7 @@ using System.Windows.Threading;
 namespace Shared;
 
 // For WPF
-struct DispatcherThreadSwitcher : INotifyCompletion
+internal readonly struct DispatcherThreadSwitcher : INotifyCompletion
 {
 	readonly Dispatcher dispatcher;
 
@@ -29,7 +29,7 @@ struct DispatcherThreadSwitcher : INotifyCompletion
 }
 
 // For both WPF and Windows Forms
-struct ThreadPoolThreadSwitcher : INotifyCompletion
+internal struct ThreadPoolThreadSwitcher : INotifyCompletion
 {
 	public ThreadPoolThreadSwitcher GetAwaiter() => this;
 	public bool IsCompleted => (SynchronizationContext.Current == null);
@@ -37,7 +37,7 @@ struct ThreadPoolThreadSwitcher : INotifyCompletion
 	public void OnCompleted(Action continuation) => ThreadPool.QueueUserWorkItem(_ => continuation());
 }
 
-class ThreadSwitcher
+internal class ThreadSwitcher
 {
 	// For WPF
 	static public DispatcherThreadSwitcher ResumeForegroundAsync(Dispatcher dispatcher) => new DispatcherThreadSwitcher(dispatcher);

@@ -26,24 +26,24 @@ namespace Sandman.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("00:00:10")]
-        public global::System.TimeSpan DelayBeforeSuspending {
+        public global::System.TimeSpan DelayBeforeSleep {
             get {
-                return ((global::System.TimeSpan)(this["DelayBeforeSuspending"]));
+                return ((global::System.TimeSpan)(this["DelayBeforeSleep"]));
             }
             set {
-                this["DelayBeforeSuspending"] = value;
+                this["DelayBeforeSleep"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("00:30:00")]
-        public global::System.TimeSpan TimeUserInactiveBeforeSuspending {
+        public global::System.TimeSpan TimeUserInactiveBeforeSleep {
             get {
-                return ((global::System.TimeSpan)(this["TimeUserInactiveBeforeSuspending"]));
+                return ((global::System.TimeSpan)(this["TimeUserInactiveBeforeSleep"]));
             }
             set {
-                this["TimeUserInactiveBeforeSuspending"] = value;
+                this["TimeUserInactiveBeforeSleep"] = value;
             }
         }
         
@@ -62,12 +62,12 @@ namespace Sandman.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("vlc;mpc-hc;steam")]
-        public string BlacklistedProcesses {
+        public string BlockingProcesses {
             get {
-                return ((string)(this["BlacklistedProcesses"]));
+                return ((string)(this["BlockingProcesses"]));
             }
             set {
-                this["BlacklistedProcesses"] = value;
+                this["BlockingProcesses"] = value;
             }
         }
         
@@ -80,6 +80,18 @@ namespace Sandman.Properties {
             }
             set {
                 this["DelayForElevatedProcess"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UpgradeRequired {
+            get {
+                return ((bool)(this["UpgradeRequired"]));
+            }
+            set {
+                this["UpgradeRequired"] = value;
             }
         }
     }
