@@ -96,6 +96,7 @@ public static class WatchAndWait
 		// Switch to background to do the wait
 		await Shared.ThreadSwitcher.ResumeBackgroundAsync();
 
+		bool bManualRestart = false;
 		try
 		{
 			// If we delay before sleeping, we need to be able to cancel it.
@@ -118,11 +119,7 @@ public static class WatchAndWait
 				await Task.Delay(Properties.Settings.Default.DelayBeforeSleep, localTokenSource.Token);
 			}
 
-			if (!SleepComputer())
-			{
-				// Sleep failed, so we must restart the wait manually.
-				await TrySleepComputerAsync(TimeSpan.Zero).ConfigureAwait(continueOnCapturedContext: false);
-			}
+			bManualRestart = !SleepComputer();
 		}
 		catch (TaskCanceledException ex)			// From CancellationToken.Cancel()
 		{
@@ -141,12 +138,18 @@ public static class WatchAndWait
 			TrySleepComplete.Set();
 		}
 
+		/// Note: We have to do this AFTER the above `finally` so that the event is set.
+		/// Then, when we try to sleep again, the wait for the event will succeed (not block).
 #if DEBUG
 		TheWindow.WriteWarning("DEBUG: Skipped sleeping computer. Simulate resuming...");
 		/// Simulate resuming (also give us time to set the <see cref="TrySleepComplete"/> event.
-		/// Note: We have to do this AFTER the above `finally` so that the event is set.
-		/// Then, when we try to sleep again, the wait for the event will succeed (not block).
-		await TrySleepComputerAsync(Properties.Settings.Default.DelayAfterResume);
+		await TrySleepComputerAsync(Properties.Settings.Default.DelayAfterResume).ConfigureAwait(continueOnCapturedContext: false);
+#else
+		if (bManualRestart)
+		{
+			// Sleep failed, so we must restart the wait manually.
+			await TrySleepComputerAsync(TimeSpan.Zero).ConfigureAwait(continueOnCapturedContext: false);
+		}
 #endif
 	}
 
