@@ -49,15 +49,19 @@ public static class WatchAndWait
 		switch (e.Mode)
 		{
 			case PowerModes.Resume:
+			{
 				TheWindow.WriteInformation(string.Empty);
 				TheWindow.WriteInformation($"PowerMode: {e.Mode}");
-				await TrySleepComputerAsync(Properties.Settings.Default.DelayAfterResume);
+				await TrySleepComputerAsync(Properties.Settings.Default.DelayAfterResume).ConfigureAwait(continueOnCapturedContext: false);
 				break;
+			}
 
 			case PowerModes.Suspend:
 			case PowerModes.StatusChange:
 			default:
+			{
 				break;
+			}
 		}
 	}
 
@@ -81,6 +85,7 @@ public static class WatchAndWait
 		await CancelWaitTaskAsync();
 		Debug.Assert(TokenSource is null);
 
+		TheWindow.WriteInformation(string.Empty);
 		TheWindow.WriteInformation("Checking if we can sleep...");
 
 		CancellationTokenSource localTokenSource = new();
@@ -113,7 +118,11 @@ public static class WatchAndWait
 				await Task.Delay(Properties.Settings.Default.DelayBeforeSleep, localTokenSource.Token);
 			}
 
-			SleepComputer();
+			if (!SleepComputer())
+			{
+				// Sleep failed, so we must restart the wait manually.
+				await TrySleepComputerAsync(TimeSpan.Zero).ConfigureAwait(continueOnCapturedContext: false);
+			}
 		}
 		catch (TaskCanceledException ex)			// From CancellationToken.Cancel()
 		{
@@ -411,20 +420,25 @@ public static class WatchAndWait
 	/// Put the computer in sleep mode.
 	/// </summary>
 	/// <see cref="https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setsuspendstate"/>
-	[Conditional("RELEASE")]
-	private static void SleepComputer()
+	/// <returns>True if sleeping computer is successful; false if not.</returns>
+	private static bool SleepComputer()
 	{
 		ArgumentNullException.ThrowIfNull(TheWindow);
 
 		TheWindow.WriteInformation("Sleeping...");
+#if DEBUG
+		bool ok = true;
+#else
 		bool ok = System.Windows.Forms.Application.SetSuspendState(System.Windows.Forms.PowerState.Suspend, force: false, disableWakeEvent: false);
+#endif
 		if (ok)
 		{
-			TheWindow.WriteInformation("Success");
+			TheWindow.WriteInformation("Success.");
 		}
 		else
 		{
-			TheWindow.WriteError("Failure");
+			TheWindow.WriteError("Failure.");
 		}
+		return ok;
 	}
 }
