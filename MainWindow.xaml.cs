@@ -67,7 +67,12 @@ public partial class MainWindow : Window
 		// add new default listener and set the filename
 		DefaultTraceListener listener = new()
 		{
-			LogFileName = pathLog
+			LogFileName = pathLog,
+			/*
+			 * Sandman Information: 0 : [2024-05-09 10:42:53] (Thread 05) Done awaiting. [CheckAgain]
+			 *		DateTime=2024-05-09T15:42:53.4329626Z
+			 */
+			//TraceOutputOptions = TraceOptions.DateTime,
 		};
 		Trace.Listeners.Add(listener);
 		Trace.AutoFlush = true;
