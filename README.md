@@ -1,6 +1,6 @@
 # Sandman by [12noon LLC](https://12noon.com)
 
-[![.NET](https://github.com/skst/Sandman/actions/workflows/dotnet.yml/badge.svg)](https://github.com/skst/Sandman/actions/workflows/dotnet.yml)
+[![Build](https://github.com/12noonLLC/Sandman/actions/workflows/build.yml/badge.svg)](https://github.com/12noonLLC/Sandman/actions/workflows/build.yml)
 
 This application will put Windows to sleep after a specified period of time, but only
 if the user is not active and certain applications are not running, etc. This is very useful for home-theater
