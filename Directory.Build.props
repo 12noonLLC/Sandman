@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+
+	<PropertyGroup>
+		<Product>Sandman</Product>
+		<Description>Sleep Windows after a specified period of time, but only if certain apps are not running, etc.</Description>
+
+		<Authors>Stefan K.S. Tucker</Authors>
+		<Company>12noon LLC</Company>
+		<Year>$([System.DateTime]::UtcNow.Year)</Year>
+		<Copyright>© 2020-$(Year) 12noon LLC</Copyright>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<VersionPrefix>1.4.0</VersionPrefix>
+		<VersionSuffix Condition="'$(Configuration)' == 'Debug'">debug</VersionSuffix>
+		<!-- `Version` defaults to `VersionPrefix`+`VersionSuffix` -->
+
+		<!-- Windows file properties A.B.C.0 -->
+		<FileVersion>$(VersionPrefix).0</FileVersion>
+
+		<!-- Stable API identity version, usually updated only on breaking changes -->
+		<!-- Only set in individual projects. -->
+		<AssemblyVersion />
+
+		<!-- Used for human-readable version, About, Explorer, crash logs, marketing|build metadata -->
+		<!-- Defaults to `Version`+githash -->
+		<InformationalVersion />
+		<IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+
+		<!-- Used for packaging (.wapproj) -->
+		<AppxBundleVersion>$(Version)</AppxBundleVersion>
+
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<ArtifactsPath>C:\VSIntermediate\Sandman\artifacts\</ArtifactsPath>
+		<BaseIntermediateOutputPath>$(ArtifactsPath)obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+	</PropertyGroup>
+
+</Project>

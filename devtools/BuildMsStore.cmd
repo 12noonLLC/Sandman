@@ -1,0 +1,158 @@
+@echo off
+rem
+rem	Perform a clean restore and build.
+rem	Run all unit tests.
+rem	Publish a standalone application.
+rem
+
+setlocal EnableExtensions EnableDelayedExpansion
+
+if NOT EXIST "Sandman.slnx" (
+  echo Run this script from the solution folder.
+  goto :EOF
+)
+
+echo.
+echo To avoid errors on locked files and folders, such as PackageLayout, etc.:
+echo    - Pause Onedrive
+echo    - Exit Visual Studio
+echo.
+echo Update the version in:
+echo    - Directory.Build.props
+
+set PROJECT=Sandman
+set ARCHIVE_NAME=%PROJECT%
+set BUILD_OUTPUT_ROOT=C:\VSIntermediate\%PROJECT%
+set ARTIFACTS_PATH=%BUILD_OUTPUT_ROOT%\artifacts
+set PUBLISH_FILES_PATH=%BUILD_OUTPUT_ROOT%\publish
+set DIRECTORY_BUILD_PROPS=.\Directory.Build.props
+set PROJECT_APP_PATH=.\%PROJECT%\%PROJECT%.csproj
+set TARGET_EXE_PATH=%ARTIFACTS_PATH%\bin\%PROJECT%\release_win-x64\%PROJECT%.exe
+REM set PROJECT_TESTS_PATH=.\%PROJECT%.UnitTests\%PROJECT%.UnitTests.csproj
+
+::
+:: PRE-BUILD CHECKS
+::
+
+echo.
+echo === COMPARE VERSIONS IN Directory.Build.props ===
+echo.
+
+rem === 1. Locate the Directory.Build.props file ===
+if not exist "%DIRECTORY_BUILD_PROPS%" (
+	echo ERROR: Version file not found: %DIRECTORY_BUILD_PROPS%
+	exit /b 1
+)
+
+rem === 2. Extract VersionPrefix from Directory.Build.props ===
+for /f "usebackq delims=" %%V in (`
+	powershell -NoLogo -NoProfile -Command ^
+		"[xml]$x = Get-Content '%DIRECTORY_BUILD_PROPS%'; $x.Project.PropertyGroup.VersionPrefix"
+`) do set "VERSION_PREFIX=%%V"
+
+if "%VERSION_PREFIX%" == "" (
+	echo ERROR: VersionPrefix not found in %DIRECTORY_BUILD_PROPS%
+	exit /b 1
+)
+
+echo Version: %VERSION_PREFIX%
+
+set VERSION=%VERSION_PREFIX%
+
+echo.
+choice /c YN /n /m "Press N to quit, Y to continue: "
+if errorlevel 2 (
+	echo Quitting...
+	exit /b 0
+)
+
+::
+:: BUILD
+::
+
+echo.
+echo === DOTNET CLEAN ===
+dotnet clean "%PROJECT_APP_PATH%" --runtime win-x64
+if errorlevel 1 exit /b %ERRORLEVEL%
+REM dotnet clean "%PROJECT_TESTS_PATH%"
+REM if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === DOTNET RESTORE ===
+dotnet restore "%PROJECT_APP_PATH%" --runtime win-x64
+if errorlevel 1 exit /b %ERRORLEVEL%
+REM dotnet restore "%PROJECT_TESTS_PATH%"
+REM if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === DOTNET BUILD RELEASE ===
+dotnet build ^
+	"%PROJECT_APP_PATH%" ^
+	--configuration Release ^
+	--no-restore
+
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === VERIFY TARGET PROPERTIES ===
+if exist "%TARGET_EXE_PATH%" (
+	sigcheck.exe -nobanner "%TARGET_EXE_PATH%"
+) else (
+	echo File does not exist: "%TARGET_EXE_PATH%"
+	exit /b
+)
+
+::
+:: TESTS
+::
+
+REM echo.
+REM echo === DOTNET BUILD UNIT TESTS ===
+REM dotnet build ^
+REM 	"%PROJECT_TESTS_PATH%" ^
+REM 	--configuration Release ^
+REM 	--no-restore
+
+REM if errorlevel 1 exit /b %ERRORLEVEL%
+
+REM echo.
+REM echo === DOTNET TEST ===
+REM dotnet test ^
+REM 	--project "%PROJECT_TESTS_PATH%" ^
+REM 	--configuration Release ^
+REM 	--no-restore ^
+REM 	--no-build ^
+REM 	--no-ansi ^
+REM 	--no-progress ^
+REM 	--output detailed
+
+REM if errorlevel 1 exit /b %ERRORLEVEL%
+
+::
+:: PUBLISH
+::
+
+echo.
+echo === DOTNET PUBLISH (Standalone) ===
+dotnet publish ^
+	"%PROJECT_APP_PATH%" ^
+	--configuration Release ^
+	--no-restore ^
+	--property:Platform=x64 ^
+	--property:RuntimeIdentifier=win-x64 ^
+	--property:PublishProtocol=FileSystem ^
+	--property:SelfContained=true ^
+	--property:PublishReadyToRun=false ^
+	--property:PublishTrimmed=false ^
+	--property:PublishSingleFile=true ^
+	--property:PublishDir="%PUBLISH_FILES_PATH%"
+
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+pushd "%PUBLISH_FILES_PATH%"
+nanazipc.exe u -tzip "%BUILD_OUTPUT_ROOT%\%ARCHIVE_NAME%_%VERSION%.zip" *.*
+popd
+
+echo Publish successful.
+
+endlocal

@@ -22,11 +22,7 @@ public partial class MainWindow : Window
 
 	static MainWindow()
 	{
-		var asm = System.Reflection.Assembly.GetEntryAssembly();
-		if (asm is not null)
-		{
-			ExecutableFolder = Path.GetDirectoryName(asm.Location) ?? string.Empty;
-		}
+		ExecutableFolder = Shared.ApplicationInformation.GetAssemblyPath() ?? string.Empty;
 	}
 
 	public MainWindow()
